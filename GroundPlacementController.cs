@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using Random=System.Random;
 
 public class GroundPlacementController : MonoBehaviour
 {
@@ -8,28 +9,43 @@ public class GroundPlacementController : MonoBehaviour
 
     private GameObject currentPlaceableObject;
 
+    [SerializeField]
     private float mouseWheelRotation;
     private int currentPrefabIndex = -1;
 
-    private bool flag = false;
-    private bool rotScaleBool = false;
+    [SerializeField]
+    private bool rotScaleMClickFlag = false;
+
+    [SerializeField]
     private float scale = 13f;
+
+    [SerializeField]
+    private bool randomRClickRotScaleFlag = false;
+
+    [SerializeField]
+    private float minRandSize = 8f;
+    [SerializeField]
+    private float maxRandSize = 20f;
+    [SerializeField]
+    private float minRandRot = 0f;
+    [SerializeField]
+    private float maxRandRot = 360f;
 
     private void Update()
     {
         HandleNewObjectHotkey();
+        if (RandRotScaleIfRightClicked())
+            randomRClickRotScaleFlag = randomRClickRotScaleFlag ? false : true;
+        
+        mouseWheelRotation %= 36f;
 
         if (currentPlaceableObject != null)
         {
             MoveCurrentObjectToMouse();
-            flag = PrintIfMiddleClicked();
-            if (flag)
-            {
-                rotScaleBool = rotScaleBool ? false : true;
-                flag = false;
-            }
-            RotateScaleFromMouseWheel(rotScaleBool);
-            ReleaseIfClicked();
+            if (RotScaleIfMiddleClicked())
+                rotScaleMClickFlag = rotScaleMClickFlag ? false : true;
+            RotateScaleFromMouseWheel(rotScaleMClickFlag);
+            ReleaseIfLeftClicked();
         }
     }
 
@@ -50,9 +66,13 @@ public class GroundPlacementController : MonoBehaviour
                     {
                         Destroy(currentPlaceableObject);
                     }
-
                     currentPlaceableObject = Instantiate(placeableObjectPrefabs[i]);
                     currentPrefabIndex = i;
+                    if (randomRClickRotScaleFlag)
+                    {
+                        scale = RandomSizeScale(minRandSize, maxRandSize);
+                        mouseWheelRotation += RandomSizeScale(minRandRot / 10f, maxRandRot / 10f);
+                    }
                 }
 
                 break;
@@ -78,10 +98,10 @@ public class GroundPlacementController : MonoBehaviour
         }
     }
 
-    private void RotateScaleFromMouseWheel(bool rotScaleBool)
+    private void RotateScaleFromMouseWheel(bool rotScaleMClickFlag)
     {
-        Debug.Log(Input.mouseScrollDelta);
-        if (rotScaleBool)
+        // Debug.Log(Input.mouseScrollDelta);
+        if (rotScaleMClickFlag)
         {
             scale += Input.mouseScrollDelta.y;
             currentPlaceableObject.transform.localScale = new Vector3(scale, scale, scale);
@@ -93,21 +113,38 @@ public class GroundPlacementController : MonoBehaviour
         }
     }
 
-    private void ReleaseIfClicked()
+    private void ReleaseIfLeftClicked()
     {
         if (Input.GetMouseButtonDown(0))
         {
+            Debug.Log("Left Click!");
             currentPlaceableObject = null;
         }
     }
 
-    private bool PrintIfMiddleClicked()
+    private bool RotScaleIfMiddleClicked()
     {
         if (Input.GetMouseButtonDown(2))
         {
-            Debug.Log("Testing Middle Click!");
+            Debug.Log("Middle Click!");
             return true;
         }
         return false;
+    }
+
+    private bool RandRotScaleIfRightClicked()
+    {
+        if (Input.GetMouseButtonDown(1))
+        {
+            Debug.Log("Right Click!");
+            return true;
+        }
+        return false;
+    }
+
+    private float RandomSizeScale(float minimum, float maximum)
+    {
+        Random rand = new Random();
+        return (float)rand.NextDouble() * (maximum - minimum) + minimum;
     }
 }
