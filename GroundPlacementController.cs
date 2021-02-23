@@ -1,8 +1,10 @@
 ﻿using System;
 using UnityEngine;
 using Random=System.Random;
+using UnityEngine.EventSystems;// Required when using Event data.
+using UnityEngine.UI;
 
-public class GroundPlacementController : MonoBehaviour
+public class GroundPlacementController : MonoBehaviour//, IPointerDownHandler, IDragHandler
 {
     [SerializeField]
     private GameObject[] placeableObjectPrefabs;
@@ -31,21 +33,64 @@ public class GroundPlacementController : MonoBehaviour
     [SerializeField]
     private float maxRandRot = 360f;
 
+    [SerializeField]
+    private float dragTimeWait = .3f;
+    private bool drag = false;
+    private float timeCount = 0.0f;
+
+    /*
+    ** Main logic explained in comments
+    */
     private void Update()
     {
+        // Checks number key input to determine what asset or prefab to instantiate
         HandleNewObjectHotkey();
+        // Handles the ability to drag and rapid place the current prefabs
+        HandleDrag();
+        // Flag to switch between random rotation and scale between
+        //    (minRandSize-maxRandSize, minRandRot-maxRandRot)
         if (RandRotScaleIfRightClicked())
             randomRClickRotScaleFlag = randomRClickRotScaleFlag ? false : true;
-        
+        // Prevents overflow/large floats
         mouseWheelRotation %= 36f;
-
         if (currentPlaceableObject != null)
         {
+            // Snaps object to mouse
             MoveCurrentObjectToMouse();
+            // Flag to switch between scaling and rotating using mouse wheel
             if (RotScaleIfMiddleClicked())
                 rotScaleMClickFlag = rotScaleMClickFlag ? false : true;
+            // Rotates or scales with mouse wheel
             RotateScaleFromMouseWheel(rotScaleMClickFlag);
-            ReleaseIfLeftClicked();
+            // Releases object where left clicked
+            drag = ReleaseIfLeftClicked();
+        }
+    }
+
+    private void HandleDrag()
+    {
+        if (drag) {
+            timeCount += Time.deltaTime;
+            // Checks for left release to stop autoplacing
+            if (Input.GetMouseButtonUp(0)) {
+                Debug.Log("Left Released");
+                timeCount = 0.0f;
+                drag = false;
+            }
+            // Waits user modifiable float dragTimeWait till the next autoplace
+            if (timeCount > dragTimeWait) {
+                timeCount += Time.deltaTime;
+                Debug.Log("Dragging...");
+                timeCount = 0.0f;
+
+                // Gets last placed object and places until left mouse released
+                NewObject(placeableObjectPrefabs[currentPrefabIndex]);
+                MoveCurrentObjectToMouse();
+                if (RotScaleIfMiddleClicked())
+                    rotScaleMClickFlag = rotScaleMClickFlag ? false : true;
+                RotateScaleFromMouseWheel(rotScaleMClickFlag);
+                currentPlaceableObject = null;
+            }
         }
     }
 
@@ -66,17 +111,21 @@ public class GroundPlacementController : MonoBehaviour
                     {
                         Destroy(currentPlaceableObject);
                     }
-                    currentPlaceableObject = Instantiate(placeableObjectPrefabs[i]);
                     currentPrefabIndex = i;
-                    if (randomRClickRotScaleFlag)
-                    {
-                        scale = RandomSizeScale(minRandSize, maxRandSize);
-                        mouseWheelRotation += RandomSizeScale(minRandRot / 10f, maxRandRot / 10f);
-                    }
+                    NewObject(placeableObjectPrefabs[i]);
                 }
-
                 break;
             }
+        }
+    }
+
+    private void NewObject(GameObject newPlaceableObjectPrefab)
+    {
+        currentPlaceableObject = Instantiate(newPlaceableObjectPrefab);
+        if (randomRClickRotScaleFlag)
+        {
+            scale = RandomSizeScale(minRandSize, maxRandSize);
+            mouseWheelRotation += RandomSizeScale(minRandRot / 10f, maxRandRot / 10f);
         }
     }
 
@@ -113,13 +162,15 @@ public class GroundPlacementController : MonoBehaviour
         }
     }
 
-    private void ReleaseIfLeftClicked()
+    private bool ReleaseIfLeftClicked()
     {
         if (Input.GetMouseButtonDown(0))
         {
             Debug.Log("Left Click!");
             currentPlaceableObject = null;
+            return true;
         }
+        return false;
     }
 
     private bool RotScaleIfMiddleClicked()
